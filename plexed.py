@@ -5,18 +5,22 @@ import time
 from discord.ext import commands
 from discord.utils import get
 from discord.ext import tasks
-from tools import checkIfProcessRunning
-from tools import randomNegativeEmoji
-from tools import randomPositiveEmoji
+import utilities as util
+# from tools import checkIfProcessRunning, randomNegativeEmoji, randomPositiveEmoji, getCurrentPlexStreams, getToken
 
 # globals
 PLEX_STATUS = ""
 
+# get an instance of the client
 client = commands.Bot(command_prefix = '.', help_command=None)
 
-# get the discord token for running the client bot
-f = open("C:\\discord-bot\\plexed-token.txt", "r")
-TOKEN = f.read()
+# get the discord token for running the client
+TOKEN = util.getToken("C:\\discord-bot\\plexed-token.txt", "r")
+
+# Tautulli stuff
+TAUTULLI_SERVER = "localhost"
+TAUTULLI_PORT = "8181"
+TAUTULLI_APIKEY = util.getToken("C:\\tautulli-key\\apikey.txt", "r")
 
 @client.event
 async def on_ready():
@@ -27,58 +31,55 @@ async def on_ready():
 @client.command(aliases=['ram','cpu','serverload'])
 async def load(ctx):
     # get the cpu usage
-    cpu = psutil.cpu_percent()
+    cpu = util.getCPU()
     # get the ram as a percentage used
-    ram = psutil.virtual_memory().percent
+    ram = util.getRAM()
     # build response string
-    response =  "```" + \
-                "Plex Server Load: \n" + \
-                "CPU: " + str(cpu) + "%\n" + \
-                "RAM: " + str(ram) + "%\n" + \
-                "```"
+    response = "```Plex Server Load: \n" + \
+                f"CPU: {cpu}%\n" + \
+                f"RAM: {ram}%\n```"
     # reply with response
     await ctx.send(response)
 
 @client.command(aliases=['heartbeat'])
 async def status(ctx):
-    channel = get(client.get_all_channels(), name='status', type=discord.ChannelType.text)
-    if checkIfProcessRunning("Plex Media Server"):
-        response =  "Plex Status: \n" + \
-                    'Running ' + randomPositiveEmoji()
-    else:
-        response =  "Plex Status: \n" + \
-                    'Unknown ' + randomNegativeEmoji()
+    await ctx.send(util.getStatus(TAUTULLI_SERVER, TAUTULLI_PORT, TAUTULLI_APIKEY))
 
-    PLEX_STATUS = await channel.send(response)
+@client.command()
+async def streams(ctx):
+    response = util.getCurrentPlexStreams(TAUTULLI_SERVER, TAUTULLI_PORT, TAUTULLI_APIKEY, False)
+    await ctx.send(response)
 
 @client.command()
 async def help(ctx):
     response =  "```" + \
-                ".help : display this message\n" + \
-                ".load : displays the RAM and CPU usage on the server" + \
+                ".help    : displays this message\n" + \
+                ".load    : displays the RAM and CPU usage on the server" + \
+                ".streams : displays how many active streams are running"
+                ".status  : displays if the server is running as well as .load and .streams"
                 "```"
     await ctx.send(response)
 
-@tasks.loop(minutes=10)
+@tasks.loop(minutes=5.0)
 async def updateStatus():
     global PLEX_STATUS
-    # check if Plex is running
-    if checkIfProcessRunning("Plex Media Server"):
-        response =  "Plex Status: \n" + \
-                    'Running ' + randomPositiveEmoji()
-    else:
-        response =  "Plex Status: \n" + \
-                    'Unknown ' + randomNegativeEmoji()
+
+    # get the channel that we want to send this message in
+    channel = get(client.get_all_channels(), name='status', type=discord.ChannelType.text)
+    
+    # get the server status
+    response = util.getStatus(TAUTULLI_SERVER, TAUTULLI_PORT, TAUTULLI_APIKEY)
+    response = response + "(I auto update every 10 min)"
 
     # check if this is our first time doing this or just an update
     if PLEX_STATUS == "":
         # first time
-        channel = get(client.get_all_channels(), name='status', type=discord.ChannelType.text)
         PLEX_STATUS = await channel.send(response)
     else:
-        # update
-        await PLEX_STATUS.edit(content=response)
+        # delete previous message and repost
+        await PLEX_STATUS.delete()
+        PLEX_STATUS = await channel.send(response)
 
-
+# run the bot
 client.run(TOKEN)
 
