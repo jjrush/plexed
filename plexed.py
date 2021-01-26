@@ -19,4 +19,4 @@ async def cpu(ctx):
     # reply with response
     await ctx.send(response)
 
-client.run('ODAzMzc5ODA3MjY5NTUyMTc5.YA87wA.JjSlH83ZmaMUVjqujFl9h5E62hQ')
+client.run('insert your token here')
