@@ -6,33 +6,31 @@ from discord.ext import commands
 from discord.utils import get
 from discord.ext import tasks
 import utilities as util
-# from tools import checkIfProcessRunning, randomNegativeEmoji, randomPositiveEmoji, getCurrentPlexStreams, getToken
+from tautulli import Tautulli as tau
+
+# get an instance of the client
+CLIENT = commands.Bot(command_prefix = '.', help_command=None)
 
 # globals
 PLEX_STATUS = ""
-
-# get an instance of the client
-client = commands.Bot(command_prefix = '.', help_command=None)
-
-# get the discord token for running the client
-TOKEN = util.getToken("C:\\discord-bot\\plexed-token.txt", "r")
+PROCESSING_MSG = ""
+PLEXED_TOKEN_FILE = "C:\\discord-bot\\plexed-token.txt"
+PLEXED_BOT_TOKEN = util.getToken(PLEXED_TOKEN_FILE, "r")
+TAUTULLI_API_FILE = "C:\\tautulli-key\\apikey.txt"
+TAUTULLI_API_KEY = util.getToken(TAUTULLI_API_FILE, "r")
 
 # Tautulli stuff
-TAUTULLI_SERVER = "localhost"
-TAUTULLI_PORT = "8181"
-TAUTULLI_APIKEY = util.getToken("C:\\tautulli-key\\apikey.txt", "r")
+TAU = tau("localhost", "8181", TAUTULLI_API_KEY )
 
-@client.event
+@CLIENT.event
 async def on_ready():
-    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name='you watch Plex | .help'))
+    await CLIENT.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name='you watch Plex | .help'))
     updateStatus.start()
     print('Bot is ready.')
 
-@client.command(aliases=['ram','cpu','serverload'])
+@CLIENT.command(aliases=['ram','cpu','serverload','usage'])
 async def load(ctx):
-    # get the cpu usage
     cpu = util.getCPU()
-    # get the ram as a percentage used
     ram = util.getRAM()
     # build response string
     response = "```Plex Server Load: \n" + \
@@ -41,22 +39,29 @@ async def load(ctx):
     # reply with response
     await ctx.send(response)
 
-@client.command(aliases=['heartbeat'])
+@CLIENT.command(aliases=['heartbeat'])
 async def status(ctx):
-    await ctx.send(util.getStatus(TAUTULLI_SERVER, TAUTULLI_PORT, TAUTULLI_APIKEY))
+    processing = util.getProcessingMessage()
+    PROCESSING_MSG = await ctx.send(processing)
+    status = TAU.getStatus()
+    await PROCESSING_MSG.delete()
+    await ctx.send(status)
 
-@client.command()
+@CLIENT.command(aliases=['streaming'])
 async def streams(ctx):
-    response = util.getCurrentPlexStreams(TAUTULLI_SERVER, TAUTULLI_PORT, TAUTULLI_APIKEY, False)
+    processing = util.getProcessingMessage()
+    PROCESSING_MSG = await ctx.send(processing)
+    response = TAU.getCurrentPlexStreams(False)
+    await PROCESSING_MSG.delete()
     await ctx.send(response)
 
-@client.command()
+@CLIENT.command()
 async def help(ctx):
     response =  "```" + \
                 ".help    : displays this message\n" + \
-                ".load    : displays the RAM and CPU usage on the server" + \
-                ".streams : displays how many active streams are running"
-                ".status  : displays if the server is running as well as .load and .streams"
+                ".load    : displays the RAM and CPU usage on the server\n" + \
+                ".streams : displays how many active streams are running\n" + \
+                ".status  : displays if the server is running as well as .load and .streams\n" + \
                 "```"
     await ctx.send(response)
 
@@ -65,21 +70,28 @@ async def updateStatus():
     global PLEX_STATUS
 
     # get the channel that we want to send this message in
-    channel = get(client.get_all_channels(), name='status', type=discord.ChannelType.text)
+    channel = get(CLIENT.get_all_channels(), name='status', type=discord.ChannelType.text)
     
-    # get the server status
-    response = util.getStatus(TAUTULLI_SERVER, TAUTULLI_PORT, TAUTULLI_APIKEY)
-    response = response + "(I auto update every 10 min)"
-
-    # check if this is our first time doing this or just an update
-    if PLEX_STATUS == "":
-        # first time
-        PLEX_STATUS = await channel.send(response)
-    else:
-        # delete previous message and repost
+    # delete the previous message and replace it
+    if PLEX_STATUS != "":
         await PLEX_STATUS.delete()
-        PLEX_STATUS = await channel.send(response)
+
+    # get the processing placeholder cause hitting the APIs is a bit slow
+    processing = util.getProcessingMessage()
+    PROCESSING_MSG = await channel.send(processing)
+
+    # get the server status
+    response = TAU.getStatus()
+    response = response + "\n(I auto update every 5 min)"
+
+    # delete the processing message
+    await PROCESSING_MSG.delete() 
+
+    # send our new status
+    PLEX_STATUS = await channel.send(response)
+
+
 
 # run the bot
-client.run(TOKEN)
+CLIENT.run(PLEXED_BOT_TOKEN)
 
