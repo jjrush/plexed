@@ -14,6 +14,7 @@ CLIENT = commands.Bot(command_prefix = '.', help_command=None)
 # globals
 PLEX_STATUS = ""
 PROCESSING_MSG = ""
+STATUS_CHANNEL = 762846620257353728
 PLEXED_TOKEN_FILE = "C:\\discord-bot\\plexed-token.txt"
 PLEXED_BOT_TOKEN = util.getToken(PLEXED_TOKEN_FILE, "r")
 TAUTULLI_API_FILE = "C:\\tautulli-key\\apikey.txt"
@@ -24,18 +25,13 @@ TAU = tau("localhost", "8181", TAUTULLI_API_KEY )
 
 @CLIENT.event
 async def on_ready():
-    await CLIENT.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name='you watch Plex | .help'))
+    await CLIENT.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name='Plex | .help'))
     updateStatus.start()
     print('Bot is ready.')
 
 @CLIENT.command(aliases=['ram','cpu','serverload','usage'])
 async def load(ctx):
-    cpu = util.getCPU()
-    ram = util.getRAM()
-    # build response string
-    response = "```Plex Server Load: \n" + \
-                f"CPU: {cpu}%\n" + \
-                f"RAM: {ram}%\n```"
+    response = TAU.getFormattedServerLoad(True)
     # reply with response
     await ctx.send(response)
 
@@ -68,27 +64,38 @@ async def help(ctx):
 @tasks.loop(minutes=5.0)
 async def updateStatus():
     global PLEX_STATUS
+    global STATUS_CHANNEL
 
     # get the channel that we want to send this message in
-    channel = get(CLIENT.get_all_channels(), name='status', type=discord.ChannelType.text)
+    text_channel = CLIENT.get_channel(762846620257353728)
+    voice_channel = CLIENT.get_channel(808969143982096436)
     
     # delete the previous message and replace it
     if PLEX_STATUS != "":
         await PLEX_STATUS.delete()
 
-    # get the processing placeholder cause hitting the APIs is a bit slow
+    # get the processing placeholder cause hitting the Tautulli APIs is a bit slow
     processing = util.getProcessingMessage()
-    PROCESSING_MSG = await channel.send(processing)
+    PROCESSING_MSG = await text_channel.send(processing)
 
     # get the server status
     response = TAU.getStatus()
     response = response + "\n(I auto update every 5 min)"
 
+    # update the voice chat's visual status
+    newName = "Status: ERROR"
+    if ( TAU.checkStatus() == "Online" ):
+        newName = f'Status: Online {util.getCheckMarkEmoji()}'
+    else:
+        newName = f'Status: Offline {util.getRedXEmoji()}'
+    await voice_channel.edit(name=newName)
+    
     # delete the processing message
     await PROCESSING_MSG.delete() 
 
     # send our new status
-    PLEX_STATUS = await channel.send(response)
+    PLEX_STATUS = await text_channel.send(response)
+    
 
 
 
