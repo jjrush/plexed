@@ -31,7 +31,8 @@ def randomPositiveEmoji():
         '<a:pepe_jammies:762882195953287188>',
         '<a:heart_bounce:774137053930848317>',
         ':white_check_mark:',
-        '<a:peepo_comfy:762882124469633074>'
+        '<a:peepo_comfy:762882124469633074>',
+        '<a:chief_dab:805254672905666580>'
         
     ]
     return emoji[getRandomNum(len(emoji)-1)]
@@ -47,6 +48,12 @@ def randomNegativeEmoji():
 
     ]
     return emoji[getRandomNum(len(emoji)-1)]
+
+def getCheckMarkEmoji():
+    return '✅'
+
+def getRedXEmoji():
+    return '❌'
 
 def getProcessingEmoji():
     return '<a:loading:804616781725040700>'

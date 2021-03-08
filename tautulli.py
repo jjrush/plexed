@@ -3,10 +3,11 @@ import requests
 import json
 
 class Tautulli():
-    def __init__(self, server, port, key):
+    def __init__(self, server, port, key, status="Online"):
         self.server = server
         self.port = port
         self.key = key
+        self.status = status
 
     def getCurrentPlexStreamsNumber(self):
         cmd = "get_activity"
@@ -33,9 +34,12 @@ class Tautulli():
         # check if Plex is running
         if util.checkIfProcessRunning("Plex Media Server"):
             # build our response
+            self.status = "Online"
             response = response + f"Running {util.randomPositiveEmoji()}\n\n"
         else:
+            self.status = "Offline"
             response = response + f"Unknown {util.randomNegativeEmoji()}\n\n"
+            return response
 
         # get the number of streams
         response = response + self.getCurrentPlexStreams(True)
@@ -43,17 +47,26 @@ class Tautulli():
         # get what is streaming
         response = response + self.getCurrentlyStreamingTitles()
 
+        # get what is streaming
+        response = response + f"\n{self.getFormattedServerLoad(False)}"
+
+        # update the voice chat channel's visual status
+        
+        return response
+
+    def checkStatus(self):
+        return self.status
+
+    def getFormattedServerLoad(self, formatted):
         # get the cpu usage
         cpu = util.getCPU()
         # get the ram as a percentage used
         ram = util.getRAM()
-
         # build the final response string
-        response = response + \
-                    "\nPlex Server Load: \n" + \
-                    f"CPU: {cpu}%\n" + \
-                    f"RAM: {ram}%\n"
-        return response
+        quote = ""
+        if ( formatted ):
+            quote = "```"
+        return f"{quote}Plex Server Load: \nCPU: {cpu}%\nRAM: {ram}%\n{quote}"
 
     def getActivityJson(self):
         cmd = "get_activity"
@@ -76,9 +89,14 @@ class Tautulli():
         else:
             sessions = data['response']['data']['sessions']
             for session in sessions:
-                reply = reply + f"{session['title']}\n"  
+                reply = reply + f"{session['full_title']}\n"  
 
         return reply
+
+    def isPlexUpdating(self):
+        if ( util.checkIfProcessRunning("Plex Update Service") ):
+            return True
+        return False
                     
 
 
